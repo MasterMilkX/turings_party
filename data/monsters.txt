@@ -1,0 +1,19 @@
+@ - robot
+F - frat member
+S - sorority member
+C - store clerk
+r - street rat
+p - pigeon
+D - delivery guy
+B - bartender
+t - cat
+N - nerd
+T - toga guy
+g - pig
+W - witch
+M - gremlin
+O - average person (college)
+A - average person (non-college)
+R - creature of the night
+u - possum
+r - raccoon
