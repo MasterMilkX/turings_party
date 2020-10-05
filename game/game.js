@@ -9,7 +9,7 @@ var stx = canvas2.getContext("2d");
 canvas2.width = 180;
 canvas2.height = 360;
 
-var size = 8;
+var size = 16;
 
 //camera
 var camera = {
@@ -50,7 +50,7 @@ var timeColors = ["#9CC6DE", "#E4C382", "#5860B4", "#1E1A20", "#1E1A20", "#1E1A2
 var steps = 0;
 var stepPerTime = 20;
 
-var location = "city";
+var area = "city";
 
 //////////////////    GENERIC FUNCTIONS   ///////////////
 
@@ -86,6 +86,9 @@ function anyActionKey(){
 
 // MOVE THE ROBOT ON THE MAP
 function moveRobot(){
+	if(!canMove)
+		return;
+
 	if(keys[upKey])
 		robot.y--;
 	else if(keys[downKey])
@@ -143,13 +146,14 @@ function renderGame(){
 	
 	//background (change with color of day if outdoors)
 	let curColor = "#000000";
-	if(location == "city")
+	if(area == "city")
 		curColor = timeColors[Math.floor(steps/stepPerTime) % timeColors.length];
 	ctx.fillStyle = curColor
 	ctx.fillRect(0,0,canvas.width, canvas.height);
 	
 	/*   add draw functions here  */
-	
+	drawCharacter(robot)
+
 	ctx.restore();
 }
 
@@ -173,7 +177,9 @@ function render(){
 }
 
 function drawCharacter(c){
-	ctx.drawCharacter
+	ctx.font = (2*size)+"px Proggy";
+	ctx.fillStyle = "#ffffff"
+	ctx.fillText(c.char, c.x*size,c.y*size);
 }
 
 
@@ -216,6 +222,7 @@ function main(){
 document.body.addEventListener("keydown", function (e) {
 	if(inArr(moveKeySet, e.keyCode)){
 		keys[e.keyCode] = true;
+		moveRobot();
 	}else if(inArr(actionKeySet, e.keyCode)){
 		keys[e.keyCode] = true;
 	}
@@ -225,6 +232,7 @@ document.body.addEventListener("keydown", function (e) {
 document.body.addEventListener("keyup", function (e) {
 	if(inArr(moveKeySet, e.keyCode)){
 		keys[e.keyCode] = false;
+		canMove = true;
 	}else if(inArr(actionKeySet, e.keyCode)){
 		keys[e.keyCode] = false;
 	}
