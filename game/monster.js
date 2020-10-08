@@ -33,7 +33,7 @@ let monsterCharMap = {
 	'l' : 'gremlin',
 	'O' : 'student', 		
 	'A' : 'adult', 		
-	'R' : 'creature of the night', 
+	'&' : 'creature of the night', 
 	'u' : 'possum',
 	'r' : 'raccoon',
 	'E' : 'alien'
@@ -54,7 +54,8 @@ function makeMonster(name='random'){
 	let mon = new monster(-1,-1, getCharRep(name));
 
 	//give character specific stats
-	
+
+	return mon;
 
 }
 

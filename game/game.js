@@ -9,15 +9,21 @@ var stx = canvas2.getContext("2d");
 canvas2.width = 180;
 canvas2.height = 360;
 
-var size = 24;
+var canvas3 = document.getElementById("text_update");
+var ttx = canvas3.getContext("2d");
+canvas3.width = 600;
+canvas3.height = 64;
+
+var size = 28;
 
 //camera
 var camera = {
 	x : 0,
 	y : 0,
 	offX : -size/2,
-	offY : -size
+	offY : -size*(3.0/4.0)
 };
+var freezeCamera = false;
 
 //KEYS
 
@@ -85,6 +91,9 @@ var stepPerTime = 20;
 
 var area = "city";
 
+// text variables
+var curTxt = "";
+
 //////////////////    GENERIC FUNCTIONS   ///////////////
 
 
@@ -118,13 +127,32 @@ function anyActionKey(){
 
 /////////////   COLLISION FUNCTIONS   ////////////////
 
-
+// CHECK COLLISION WITH ANYTHING
 function collide(x,y){
 	return mapCollide(x,y) && noChar(x,y);
 }
+
+// CHECK IF COLLIDED WITH A MAP OBJECT
 function mapCollide(x,y){
-	return x > map[0].length || y > map.length || inArr(map[y][x], collidable)
+	return x > map[0].length || y > map.length || inArr(collidable, map[y][x])
 }
+
+
+// CHECK IF A CHARACTER IS AT THAT SPACE ON THE MAP
+function noChar(x,y){
+	if(robot.x == x && robot.y == y)
+		return false;
+
+	//check for enemies and items
+	for(let m=0;m<curMonsters.length;m++){
+		let mon = curMonsters[m];
+		if(mon.x == x && mon.y == y)
+			return false;
+	}
+
+	return true;
+}
+
 
 //////////////    PLAYER FUNCTIONS   /////////////////
 
@@ -168,13 +196,13 @@ function drunkAI(ai){
 
 	//remove illegal moves
 	
-	if(inArr(map[ai.y-1][ai.x], collidable))
+	if(collide(ai.x,ai.y-1))
 		possMoves.splice(possMoves.indexOf("up"),1);
-	if(inArr(map[ai.y+1][ai.x], collidable))
+	if(collide(ai.x,ai.y+1))
 		possMoves.splice(possMoves.indexOf("down"),1);
-	if(inArr(map[ai.y][ai.x-1], collidable))
+	if(collide(ai.x-1,ai.y))
 		possMoves.splice(possMoves.indexOf("left"),1);
-	if(inArr(map[ai.y][ai.x+1], collidable))
+	if(collide(ai.x+1,ai.y))
 		possMoves.splice(possMoves.indexOf("right"),1);
 	
 
@@ -262,13 +290,58 @@ function renderStatus(){
 
 	/* add draw function here */
 
+	stx.fillStyle = '#ffffff';
+
+	//draw robot stats
+	let mid = canvas2.width/2;
+	stx.font = '24px Proggy';
+	stx.textAlign = "center";
+	stx.fillText("-- STATS --", mid, 20);
+
+	stx.font = '18px Proggy';
+	stx.textAlign = "right";
+	stx.fillText("STR: " + robot.stats['str'], mid-20, 40);
+	stx.fillText("CON: " + robot.stats['con'], mid-20, 60);
+	stx.fillText("DEX: " + robot.stats['dex'], mid-20, 80);
+	stx.textAlign = "left"
+	stx.fillText("CHA: " + robot.stats['str'], mid+20, 40);
+	stx.fillText("INT: " + robot.stats['con'], mid+20, 60);
+	stx.fillText("WIS: " + robot.stats['dex'], mid+20, 80);
+
+	stx.fillRect(0,100,canvas2.width,2)
+
+	//inventory
+	stx.font = '24px Proggy';
+	stx.fillStyle = '#ffffff';
+	stx.textAlign = "center";
+	stx.fillText("-- INVENTORY --", mid, 125);
+
+
 	stx.restore();
+}
+
+function renderText(){
+	ttx.save();
+	ttx.clearRect(0,0, canvas3.width, canvas3.height);
+
+	ttx.fillStyle = "#4C5377";
+	ttx.fillRect(0,0,canvas3.width, canvas3.height);
+
+	/* add draw function here */
+	
+	ttx.font = '30px Proggy';
+	ttx.fillStyle = '#ffffff';
+	//ttx.fillText(String.fromCharCode(9590) + String.fromCharCode(9472) + String.fromCharCode(9488), 10, 20);
+	ttx.fillText(curTxt, 10, 28);
+
+	ttx.restore();
 }
 
 // UPDATE RENDER FOR BOTH CANVASES
 function render(){
 	renderGame();
 	renderStatus();
+	renderText();
 }
 
 // draw the character (robot or monster) on the game screen
@@ -284,39 +357,55 @@ function drawMap(){
 	if(map.length == 0)		//nothing to draw so don't bother
 		return;
 
-	ctx.font = size+"px Proggy";
+	ctx.font = (size)+"px Proggy";
+	//ctx.font = (size+12)+"px Proggy";
 	ctx.fillStyle = "#cdcdcd";
 	ctx.textAlign = "center";
 	for(let r=0;r<map.length;r++){
 		for(let c=0;c<map[0].length;c++){
-			if(noChar(c,r))
-				ctx.fillText(map[r][c], c*size, r*size);
+			if(noChar(c,r)){
+				let m = map[r][c];
+				ctx.fillText((Number.isInteger(m) ? String.fromCharCode(m) : m), c*size, r*size);
+			}
 		}
 	}
 	
 }
 
-// check if a character is at that space on the map
-function noChar(x,y){
-	if(robot.x == x && robot.y == y)
-		return false;
-
-	//check for enemies and items
-	for(let m=0;m<curMonsters.length;m++){
-		let mon = curMonsters[m];
-		if(mon.x == x && mon.y == y)
-			return false;
-	}
-
-	return true;
-}
-
-
 //////////////   GAME LOOP FUNCTIONS   //////////////////
 
 // GAME INITIALIZATION FUNCTION
 function init(){
-	map = initMap(20,20);
+	//map = initMap(20,20);
+	gotoHouse("random");
+}
+
+// MAKE A NEW SCREEN FOR A HOUSE
+function gotoHouse(house){
+	//make a new house
+	map = padMap(map2Box(makeHouseMap(house)),Math.floor(canvas.width/size),Math.floor(canvas.height/size));
+	
+	//freeze the camera if house is small
+	if((map[0].length-1) <= Math.floor(canvas.width/size) && (map.length-1) <= Math.floor(canvas.height/size))
+		freezeCamera = true;
+	else
+		freezeCamera = false;
+
+	//get robot position
+	let enterPos = findDoor(map);
+	robot.x = enterPos[1];
+	robot.y = enterPos[0]-1;	//don't want to be on top of the door
+
+	//make monsters in the house (placeholder)
+	for(let i=0;i<3;i++){
+		let mon = makeMonster();
+		let pos = randomHousePos(map);
+		mon.x = pos[0];
+		mon.y = pos[1];
+		curMonsters.push(mon);
+	}
+
+	curTxt = "Entered a " + house + " house!";
 }
 
 // MAIN GAME LOOP
@@ -324,7 +413,8 @@ function main(){
 	requestAnimationFrame(main);
 	canvas.focus();
 
-	panCamera();
+	if(!freezeCamera)
+		panCamera();
 
 	render();
 

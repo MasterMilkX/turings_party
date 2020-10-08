@@ -32,14 +32,30 @@
 				margin-right: auto;
 
 			}
+			#text_update{
+				width:600px;
+				height:64px;
+				border:2px solid #ffffff;
+				padding-left: 0;
+				padding-right: 0;
+				margin-top: 10px;
+			}
+			#container{
+				margin-right: auto;
+				margin-left: auto;
+				width: 620px;
+			}
 			@font-face {font-family: Proggy; src: url('ProggySquare.ttf');}
 		</style>
 		<script src="pcg.js"></script>
 		<script src="monster.js"></script>
 	</head>
 	<body onload='init()'>
-		<canvas id='game'>This is the main screen</canvas>
-		<canvas id='status'>This is the text status screen</canvas>
+		<div id='container'>
+			<canvas id='game'>This is the main screen</canvas>
+			<canvas id='status'>This is the text status screen</canvas>
+			<canvas id='text_update'>This is the text update screen</canvas>
+		</div>
 		<!--<div id="debugBar"><p id="debug" style="color:white">...</p></div>-->
 		<script src="game.js"></script>
 	</body>
