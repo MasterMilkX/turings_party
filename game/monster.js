@@ -1,42 +1,46 @@
 // "MONSTER" CHARACTERS OBJECT CREATION FUNCTION
-function monster(x,y,char,mode='neutral'){
+function monster(x,y,char,mode='neu'){
 	this.x = x;
 	this.y = y;
 	this.char = char;
 	this.mode = mode;
+	this.move = 'drunk';
 
 	//stats
 	this.stats = {
-		str : 0,
-		con : 0,
-		dex : 0,
-		cha : 0,
-		int : 0,
-		wis : 0
+		'str' : 0,
+		'con' : 0,
+		'dex' : 0,
+		'cha' : 0,
+		'int' : 0,
+		'wis' : 0
 	};
+
+	this.dialogue = [""];
 }
 
 // ASCII CHARACTER TO MONSTER NAME MAP
 let monsterCharMap = {
 	'F' : 'frat boy',
 	'S' : 'sorority girl',
-	'C' : 'store clerk',
-	'r' : 'street rat',
-	'p' : 'pigeon',
+	'L' : 'store clerk',
+	'e' : 'street rat',
+	'g' : 'pigeon',
 	'D' : 'delivery guy',
 	'B' : 'bartender',
-	't' : 'cat',
+	'c' : 'cat',
 	'N' : 'nerd',
 	'T' : 'toga guy',
-	'g' : 'pig',
+	'p' : 'pig',
 	'W' : 'witch',
-	'l' : 'gremlin',
+	'm' : 'gremlin',
 	'O' : 'student', 		
 	'A' : 'adult', 		
 	'&' : 'creature of the night', 
 	'u' : 'possum',
 	'r' : 'raccoon',
-	'E' : 'alien'
+	'E' : 'alien',
+	'@' : 'robot'
 }
 
 // RETURNS THE ASCII CHARACTER BASED ON THE NAME
@@ -54,9 +58,53 @@ function makeMonster(name='random'){
 	let mon = new monster(-1,-1, getCharRep(name));
 
 	//give character specific stats
+	if(inArr(['frat boy', 'toga guy'], name)){
+		assignStats(mon, statRoller('fighter'));
+		mon.mode = 'str'
+	}
+	else if(inArr(['nerd','store clerk','alien'], name)){
+		assignStats(mon, statRoller('wizard'));
+		mon.mode = 'int';
+	}else if(inArr(['gremlin','creature of the night','raccoon'], name)){	
+		assignStats(mon, statRoller('rogue'));
+		mon.mode = 'dex';
+	}else if(inArr(['sorority girl','bartender','cat'], name)){
+		assignStats(mon, statRoller('bard'));
+		mon.mode = 'cha';
+	}
+	else if(inArr(['witch','delivery guy'], name)){
+		assignStats(mon, statRoller('ranger'));
+		mon.mode = 'wis';
+	}
+	else if(inArr(['street rat','pigeon','pig','possum'], name)){
+		assignStats(mon, statRoller('druid'))
+		mon.mode = 'con';
+	}
+	else{
+		assignStats(mon, statRoller('random'))
+		mon.mode = 'neu';
+	}
 
 	return mon;
 
+}
+
+function makeMonsterPlus(name,map,excl=[],placeTile='.'){
+	let mon = makeMonster(name);
+	let pos = randomHousePos(map,excl,placeTile);
+	mon.x = pos[0];
+	mon.y = pos[1];
+	return mon;
+}
+
+// ASSIGNS A STAT LIST TO A CHARACTER
+function assignStats(char,statList){
+	char.stats['str'] = statList[0];
+	char.stats['con'] = statList[1];
+	char.stats['dex'] = statList[2];
+	char.stats['cha'] = statList[3];
+	char.stats['int'] = statList[4];
+	char.stats['wis'] = statList[5];
 }
 
 // RANDOM DnD STAT ROLLER
@@ -87,7 +135,7 @@ function statRoller(rpg_class){
 	}else if(rpg_class == 'ranger'){
 		high = 5;
 		low = 1;
-	}else if(rpg_class == 'barbarian'){
+	}else if(rpg_class == 'druid'){
 		high = 1;
 		low = 2;
 	}else{		//random - default
@@ -134,4 +182,161 @@ function roll4d6(){
 		t += d[j];
 	}
 	return t;
+}
+
+// ADD MONSTERS TO HOUSE BASED ON TYPE
+function monsterHouse(house,excl=[]){
+	let mons = [];
+
+	if(house['htype'] == 'LAN party'){
+		//add nerds at computers
+		for(let i=0;i<4;i++){
+			let mon = makeMonsterPlus('nerd',house['map'],excl,'_');
+			excl.push(mon.x+"-"+mon.y);
+			mon.move = 'idle';		//sit at computer
+			mons.push(mon);
+		}
+	}
+	else if(house['htype'] == 'small party'){
+		//add students
+		for(let i=0;i<6;i++){
+			let m = 'student';
+			if(Math.random() <= 0.2)
+				m = 'robot';
+			let mon = makeMonsterPlus(m,house['map'],excl);
+			excl.push(mon.x+"-"+mon.y);
+			mons.push(mon);
+		}
+
+		//maybe add an alien
+		if(Math.random() <= 0.1){
+			mons.push(makeMonsterPlus('alien',house['map'],excl));
+		}
+	}
+
+	else if(house['htype'] == 'normal house'){
+		//add 2 adults, students, or aliens
+		let enc = Math.random();
+		let m = '';
+		if(enc <= 0.45)
+			m = 'adult';
+		else if(enc <= 0.9)
+			m = 'student';
+		else
+			m = 'alien';
+		for(let i=0;i<2;i++){
+			let mon = makeMonsterPlus(m,house['map'],excl);
+			excl.push(mon.x+"-"+mon.y);
+			mons.push(mon);
+		}
+
+		//maybe a rat or gremlin
+		enc = Math.random();
+		if(enc <= 0.2){
+			mons.push(makeMonsterPlus('street rat',house['map'],excl));
+		}else if(enc <= 0.25){
+			mons.push(makeMonsterPlus('gremlin',house['map'],excl));
+		}
+	}
+	else if(house['htype'] == 'witch party'){
+		//add witches at cauldrons
+		for(let i=0;i<4;i++){
+			let mon = makeMonsterPlus('witch',house['map'],excl,'_');
+			excl.push(mon.x+"-"+mon.y);
+			mon.move = 'idle';		//sit at computer
+			mons.push(mon);
+		}
+		//add other monsters?
+		let enc = Math.random();
+		if(enc <= 0.5){
+			mons.push(makeMonsterPlus('cat',house['map'],excl));
+		}else if(enc <= 0.6){
+			mons.push(makeMonsterPlus('street rat',house['map'],excl));
+		}else if(enc <= 0.65){
+			mons.push(makeMonsterPlus('gremlin',house['map'],excl));
+		}
+	}
+
+	else if(house['htype'] == 'large party (lower)'){
+		let enc = Math.random();
+		let beerPongPos = [[5,7],[6,7],[5,12],[6,12],[9,4],[9,5],[13,4],[13,5]];
+		if(enc <= 0.4){		//greek party
+			for(let i=0;i<12;i++){
+				let m = '';
+				let c = Math.random();
+				if(c <= 0.45)
+					m = 'frat boy';
+				else if(c <= 0.9)
+					m = 'sorority girl';
+				else
+					m = 'toga guy';
+
+				let mon = makeMonsterPlus(m,house['map'],excl);
+
+				//randomly change location (couch or table)
+				c = Math.random();
+				if(c <= 0.2){	//sit on couch
+					let p = randomHousePos(map, excl, '_');
+					mon.x = p[0];
+					mon.y = p[1];
+					mon.move = 'idle';
+				}else if(c <= 0.45 && beerPongPos.length > 0){
+					let pi = Math.floor(Math.random()*beerPongPos.length);
+					mon.x = beerPongPos[pi][0];
+					mon.y = beerPongPos[pi][1];
+					beerPongPos.splice(pi,1);		//remove from spots
+					mon.move = 'idle'
+				}
+				excl.push(mon.x+"-"+mon.y);
+
+				//extra stat boost for toga guy
+				if(m == 'toga guy'){
+					mon.stats['str']+=2;	
+					mon.stats['con']+=2;
+				}
+				mons.push(mon);
+			}
+
+			//maybe add a pig for fun
+			if(Math.random() <= 0.4){
+				mons.push(makeMonsterPlus('pig',house['map'],excl));
+			}
+		}else{		//regular college party
+			for(let i=0;i<12;i++){
+				let m = '';
+				let c = Math.random();
+				if(c <= 0.6)
+					m = 'student';
+				else if(c <= 0.7)
+					m = 'frat boy';
+				else if(c <= 0.8)
+					m = 'sorority girl';
+				else if(c <= 0.9)
+					m = 'nerd';
+				else
+					m = 'alien';
+
+				let mon = makeMonsterPlus(m,house['map'],excl);
+				//randomly change location (couch or table)
+				c = Math.random();
+				if(c <= 0.2){	//sit on couch
+					let p = randomHousePos(map, excl, '_');
+					mon.x = p[0];
+					mon.y = p[1];
+					mon.move = 'idle';
+				}else if(c <= 0.45 && beerPongPos.length > 0){
+					let pi = Math.floor(Math.random()*beerPongPos.length);
+					mon.x = beerPongPos[pi][0];
+					mon.y = beerPongPos[pi][1];
+					beerPongPos.splice(pi,1);		//remove from spots
+					mon.move = 'idle'
+				}
+				excl.push(mon.x+"-"+mon.y);
+				mons.push(mon);
+			}
+		}
+	}
+
+
+	return mons;
 }
