@@ -31,7 +31,58 @@ function furniture(name,x,y){
 	this.y=y;
 	this.txt="";
 	this.c = objColor(name);
+	this.interSet = assignFurnInteract(name);
 }
+// OBJECT INTERACTION EFFECT
+function interact(prob, statFX, text){
+	this.prob = prob;
+	this.statFX = statFX;
+	this.text = text;
+}	
+
+// GIVE ASSIGNMENT OF FURNITURE INTERACTIONS
+function assignFurnInteract(name){
+	let i = {}
+	if(name == 'table'){
+		i[1] = [new interact(0.45,[0,0,2,1,0,0], 'You won!'),
+					new interact(0.35, [0,-1,0,0,0,0], 'You lost...'),
+					new interact(0.2,[0,0,-1,-1,0,0], 'Party foul!')];
+		i[2] = [new interact(0.5, [0,-1,0,-1,0,0], 'You lost...'),
+					new interact(0.5, [0,2,0,1,0,0], 'You win!')];
+		i[3] = [new interact(0.25, [0,0,1,1,0,0], "Dare: You did a fuckin' flip!"),
+					new interact(0.25, [0,-1,0,1,0,-1], "Dare: You chugged some mystery liquid!"),
+					new interact(0.25, [0,0,0,1,0,2], "Dare: You said no to drugs!"),
+					new interact(0.25, [0,0,0,-2,0,0], "Truth: You said you're a robot...")];
+		
+		i['opt'] = "1) Beer Pong  2) Drinking race  3) T or D";
+	}else if(name == 'computer'){
+		i[1] = [new interact(0.2, [0,0,1,0,1,0],"Learned basic physics!"),
+					new interact(0.2, [0,0,0,2,0,0], "Learned how to socialize!"),
+					new interact(0.2, [0,0,0,0,2,0], "Watched a TED Talk!"),
+					new interact(0.4, [0,0,0,0,-1,0], "Watched meme compilations...")];
+		i[2] = [new interact(1.0, [2,0,0,0,0,-2], "You smashed the computer...")];
+		i['opt'] = "1) Internet  2) Smash it!";
+	}else if(name == 'tv'){
+		i[1] = [new interact(0.5, [0,0,0,0,-1,0], "It's just static..."),
+					new interact(0.5, [0,0,0,0,1,0], "A Netflix show is on...")];
+		i[2] = [new interact(0.5, [0,0,1,0,0,0], "You won Rainbow Road!"),
+				new interact(0.5, [0,-1,0,0,0,0], "You drove off Rainbow Road..."),
+				];
+		i['opt'] = "1) Watch TV  2) Play Drunk Mario Kart";
+	}else if(name == 'stereo'){
+		i[1] = [new interact(1.0, [0,0,0,-1,0,0], "You change the song...")];
+		i['opt'] = "1) Change the song"
+	}else if(name == 'keg'){
+		i[1] = [new interact(0.8, [0,2,0,0,0,0], "Chug successful!"),
+				new interact(0.2, [0,-3,0,0,0,0], "You puked and short-circuited...")]
+		i['opt'] = "1) Chug"
+	}
+
+	return i;
+}
+
+
+
 
 let boxConv = {
 	'#   ' : 9589,	//only top
@@ -50,9 +101,16 @@ let boxConv = {
 	'# ##' : 9524,	//t top
 	'####' : 9532	//plus
 }
-var collidable = ['#','=',']','+', '|', ' ']
+var collidable = ['#','=',']','+', '|']
 collidable.push.apply(collidable,Object.values(boxConv))
 
+
+// CHECKS IF AN ELEMENT IS IN AN ARRAY
+function inArr(arr, e){
+	if(arr.length == 0)
+		return false;
+	return arr.indexOf(e) !== -1
+}
 
 // MAKES INITIAL MAP
 function initMap(wRange, hRange, randomDim=false){
@@ -71,7 +129,7 @@ function blankMap(wRange, hRange, randomDim=false){
 	}
 	
 
-	console.log(w + " x " + h);
+	//console.log(w + " x " + h);
 
 	//make map with borders and floor
 	var m = []
@@ -106,8 +164,10 @@ function randomHousePos(map, exclusions=[],char='.'){
 			}	
 		}
 	}
-
-	return floor[Math.floor(Math.random()*floor.length)];
+	if(floor.length > 0)
+		return floor[Math.floor(Math.random()*floor.length)];
+	else
+		return []
 }
 
 // MAKES A HOUSE
@@ -380,7 +440,7 @@ function findDoor(map){
 	for(let r=0;r<map.length;r++){
 		for(let c=0;c<map[0].length;c++){
 			if(map[r][c] == '/'){
-				return [r,c];
+				return [c,r];
 			}
 		}
 	}
@@ -411,4 +471,204 @@ function objColor(name){
 		return '#A0C4AE'
 	else
 		return '#ffffff';
+}
+
+
+
+///////   OVERWORLD FUNCTIONS   ///////
+function baseOverworld(start_side=""){
+	let m = blankMap([20,30], [20,30], true);
+	let dir = ["north", "south", "west", "east"];
+	let newdir = []
+	if(start_side != "")
+		newdir.push.apply(newdir,dir.splice(dir.indexOf(start_side),1));
+
+	newdir.push.apply(newdir,dir.splice(Math.floor(Math.random()*dir.length),1));
+
+	if(Math.random() < 0.3)
+		newdir.push.apply(newdir,dir.splice(Math.floor(Math.random()*dir.length),1));
+	if(Math.random() < 0.1)
+		newdir.push.apply(newdir,dir.splice(Math.floor(Math.random()*dir.length),1));
+
+	makeRoadDir(m,newdir);
+
+	
+	return m
+}
+
+// ADDS MAIN ROADS TO A MAP
+function makeRoadDir(map, dirSet){
+	let mx = Math.floor(map[0].length/2);
+	let my = Math.floor(map.length/2);
+
+	//make a box in the center point
+	for(let y=-2;y<=2;y++){
+		for(let x=-2;x<=2;x++){
+			let c = ' '
+			if(y == -2 || y == 2)
+				c = 9548;
+			if(x == -2 || x == 2)
+				c = 9550;
+			map[my+y][mx+x] = c;
+		}
+	}
+
+	//add directional roads accordingly
+	if(inArr(dirSet,'north')){
+		for(let y=my-2;y>=0;y--){
+			for(let w=-2;w<=2;w++){	
+				let c = ' '
+				if(w == 0 && y%3 == 0)			//marker line (white rectangle)
+					c = 9647;
+				else if(w == -2 || w == 2)		//sidewalk (dottod line)
+					c = 9550;
+
+				map[y][mx+w] = c;
+			}
+		}
+	}if(inArr(dirSet,'south')){
+		for(let y=my+2;y<map.length;y++){
+			for(let w=-2;w<=2;w++){		
+				let c = ' '
+				if(w == 0 && y%3 == 0)			//marker line (white rectangle)
+					c = 9647;
+				else if(w == -2 || w == 2)		//sidewalk (dottod line)
+					c = 9550;
+				
+				map[y][mx+w] = c;
+			}
+		}
+	}if(inArr(dirSet,'east')){
+		for(let x=mx+2;x<map[0].length;x++){
+			for(let w=-2;w<=2;w++){		
+				let c = ' '
+				if(w == 0 && x%3 == 0)			//marker line (white rectangle)
+					c = 9645;
+				else if(w == -2 || w == 2)		//sidewalk (dottod line)
+					c = 9548;
+
+				map[my+w][x] = c;
+			}
+		}
+	}if(inArr(dirSet, 'west')){
+		for(let x=mx-2;x>=0;x--){
+			for(let w=-2;w<=2;w++){		
+				let c = ' '
+				if(w == 0 && x%3 == 0)			//marker line (white rectangle)
+					c = 9645;
+				else if(w == -2 || w == 2)		//sidewalk (dottod line)
+					c = 9548;
+
+				map[my+w][x] = c;
+			}
+		}
+	}
+
+}
+
+
+// ADDS BUILDINGS TO THE MAP IN OPEN AREAS
+function makeBuildings(map,range=[3,10]){
+	let small = [['#','#','#','#'],
+				['#',' ',' ','#'],
+				['#',' ',' ','#'],
+				['#','/','#','#']]
+	let small2 = [['#','#','#','#'],
+				['#',' ',' ','#'],
+				['#',' ',' ','#'],
+				['#','#','/','#']]
+	let large = [['#','#','#','#','#','#','#'],
+				['#',' ',' ',' ',' ',' ','#'],
+				['#',' ',' ',' ',' ',' ','#'],
+				['#',' ',' ',' ',' ',' ','#'],
+				['#','/','#','#','#','#','#']]
+	let office_building = [['#','#','#','#','#','#'],
+						  ['#',' ',' ',' ',' ','#'],
+						  ['#',' ',' ',' ',' ','#'],
+						  ['#','#','#','#','|','#']]
+	let skyscraper = [['#','#','#','#','#','#','#'],
+						  ['#',' ',' ',' ',' ',' ','#'],
+						  ['#',' ',' ',' ',' ',' ','#'],
+						  ['#',' ',' ',' ',' ',' ','#'],
+						  ['#',' ',' ',' ',' ',' ','#'],
+						  ['#',' ',' ',' ',' ',' ','#'],
+						  ['#','#','#','|','#','#','#']]
+
+	let bar_store = [['#','#','#'],['#','_','#'],['=','=','=']]
+
+
+	let all_buildings = {
+		'small' : [[4,4],small],
+		'small2' : [[4,4],small2],
+		'large' : [[7,5],large],
+		'office_building' : [[6,4],office_building],
+		'skyscraper' : [[7,7], skyscraper],
+		'bar' : [[3,3], bar_store],
+		'store' : [[3,3], bar_store]
+	}
+
+	let numBuildings = Math.floor(Math.random()*(range[1]-range[0]))+range[0];
+	let buildSets = Object.keys(all_buildings);
+
+	let doorset = [];
+	for(let b=0;b<numBuildings;b++){
+		let buildName = buildSets[Math.floor(Math.random()*buildSets.length)];
+		let door = placeBuilding(map, all_buildings[buildName]);
+		if(door.length > 0){
+			doorset.push([door,buildName])
+		}
+	}
+	return doorset;
+
+}
+
+// FINDS A SUITABLE LOCATION ON THE MAP FOR THE GIVEN DIMENSIONS
+function placeBuilding(map, build){
+	let lim = 50;
+	let dim = build[0];
+	let arch = build[1];
+
+	for(let i=0;i<lim;i++){
+		//get random top left corner point to place
+		let x = Math.floor(Math.random()*(map[0].length-dim[0]-2))+1;
+		let y = Math.floor(Math.random()*(map.length-dim[1]-2))+1;
+
+		//check from that point on
+		let badPt = false;
+		for(let a=0;a<dim[0]+2;a++){
+			for(let b=0;b<dim[1]+2;b++){
+				if(map[y+b][x+a] != "."){
+					badPt = true;
+					break;
+				}	
+			}
+			if(badPt)
+				break;
+		}
+
+		//allow building to be made at location
+		if(!badPt){
+
+			arch = map2Box(arch);		//convert
+
+			let door = [];
+			for(let a=0;a<dim[0];a++){
+				for(let b=0;b<dim[1];b++){
+					map[y+b+1][x+a+1] = arch[b][a];
+					if(arch[b][a] == '/')
+						door = [x+a+1,y+b+1];
+				}
+			}
+			return door;
+		}
+	}
+
+	return [];
+}
+
+
+function makeOverworld(start_side="", buildRange=[3,7]){
+	let m = baseOverworld(start_side);
+	let doorSet = makeBuildings(m,buildRange);
+	return {'map': m, 'doors': doorSet};
 }

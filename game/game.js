@@ -36,10 +36,9 @@ var downKey = 40;   //[Down]
 var waitKey = 83;	//[S]
 var moveKeySet = [upKey, leftKey, rightKey, downKey, waitKey];
 
-// A and b
-var a_key = 90;   //[Z]
-var b_key = 88;   //[X]
-var actionKeySet = [a_key, b_key];
+// Option select keys
+var num_key_set = [49,50,51,52,53,54];
+var inOpt = false;
 
 var keys = [];
 var canMove = true;
@@ -66,6 +65,8 @@ var robot = {
 	//interaction
 	mode : 'neutral',
 	obj : null,
+	other : null,
+	socialAct : {},
 
 	//stats
 	stats : {
@@ -92,6 +93,11 @@ var curMonsters = [];
 // MAP VARIABLES
 var map = []
 var map_obj = [];
+var world_doors = [];
+var overworldPos = [];
+
+var savedOverWorld = {};
+var savedHouses = {};
 
 
 // location variables
@@ -117,6 +123,11 @@ function inArr(arr, e){
 	return arr.indexOf(e) !== -1
 }
 
+// COPIES A 2D ARRAY
+function copy2d(arr){
+	return arr.map(a => a.slice());
+}
+
 
 ////////////////   KEYBOARD FUNCTIONS  //////////////////
 
@@ -126,7 +137,7 @@ var keyTick = 0;
 var kt = null; 
 
 function anyKey(){
-	return anyMoveKey() || anyActionKey();
+	return anyMoveKey()
 }
 
 // CHECK IF ANY DIRECTIONAL KEY IS HELD DOWN
@@ -134,9 +145,6 @@ function anyMoveKey(){
 	return (keys[upKey] || keys[downKey] || keys[leftKey] || keys[rightKey])
 }
 
-function anyActionKey(){
-	return (keys[a_key] || keys[b_key]);
-}
 
 /////////////   COLLISION FUNCTIONS   ////////////////
 
@@ -189,15 +197,28 @@ function moveRobot(){
 	if(!canMove)
 		return;
 
+	if(inOpt){
+		inOpt = false;
+		newTxt("Nevermind...");
+	}
+
 	//see if touching anything
-	if(keys[upKey])
+	if(keys[upKey]){
 		robot.obj = touchObj(robot.x,robot.y-1);
-	if(keys[downKey])
+		robot.other = touchPer(robot.x,robot.y-1);
+	}
+	if(keys[downKey]){
 		robot.obj = touchObj(robot.x,robot.y+1);
-	if(keys[leftKey])
+		robot.other = touchPer(robot.x,robot.y+1);
+	}
+	if(keys[leftKey]){
 		robot.obj = touchObj(robot.x-1,robot.y);
-	if(keys[rightKey])
+		robot.other = touchPer(robot.x-1,robot.y);
+	}
+	if(keys[rightKey]){
 		robot.obj = touchObj(robot.x+1,robot.y);
+		robot.other = touchPer(robot.x+1,robot.y);
+	}
 	
 
 	if(keys[upKey] && !collide(robot.x, robot.y-1))
@@ -209,14 +230,257 @@ function moveRobot(){
 	else if(keys[rightKey] && !collide(robot.x+1, robot.y))
 		robot.x++;
 
-	//check for any objects
+	//check if entering door
+	if(map[robot.y][robot.x] == '/'){
+		enterDoor();
+	}
+
+	
 	let obj = robot.obj;
+	let other = robot.other;
+	//check for any objects
 	if(obj != null && !inArr(['_',':','}'], map[obj.y][obj.x])){
-		newTxt((obj.txt == "" ? ("It's a " + obj.name + "!") : obj.txt));
+		if(!('opt' in obj.interSet))
+			newTxt((obj.txt == "" ? ("It's a " + obj.name + "!") : obj.txt));
+		else{
+			inOpt = true;
+			newTxt("What do you want to do?\n" + obj.interSet['opt']);
+		}	
+
+	}
+	//check for people
+	else if(other != null){
+		let t1 = "";
+		let t2 = "";
+		//show character information based on stats
+		let mon_name = monsterCharMap[other.char];
+		mon_name = mon_name.charAt(0).toUpperCase() + mon_name.slice(1);
+
+		if(robot.stats['int'] == 0)
+			t1 = "???: " + monIntro[other.char];
+		else if(robot.stats['int'] < 10)
+			t1 = mon_name + ": " + monIntro[other.char];
+		else
+			t1 = mon_name + " (" + showHighStat(other) + "): " + monIntro[other.char];
+		
+		//show options based on stats
+		let i = 1;
+
+		//fight
+		if(robot.stats['str'] == 0){
+			//do nothing
+		}else if(robot.stats['str'] >= 10){
+			t2 += i + ") Punch ";
+			robot.socialAct[i] = 'punch';
+			i++;
+		}else if(robot.stats['str'] >= 5){
+			t2 += i + ") Push ";
+			robot.socialAct[i] = 'push';
+			i++;
+		}
+
+		//cool wave
+		if(robot.stats['dex'] == 0){
+			//do nothing
+		}else if(robot.stats['dex'] >= 15){
+			t2 += i + ") Finger Guns ";
+			robot.socialAct[i] = 'finger guns';
+			i++;
+		}else if(robot.stats['dex'] >= 5){
+			t2 += i + ") Wave ";
+			robot.socialAct[i] = 'wave';
+			i++;
+		}
+
+
+		//flirt
+		if(robot.stats['cha'] == 0){
+			//do nothing
+		}else if(robot.stats['cha'] >= 13){
+			t2 += i + ") Flirt ";
+			robot.socialAct[i] = 'flirt';
+			i++;
+		}else if(robot.stats['cha'] >= 5){
+			t2 += i + ") Talk ";
+			robot.socialAct[i] = 'talk';
+			i++;
+		}
+
+		//give item or ask question
+		if(robot.stats['wis'] == 0){
+			//do nothing
+		}else if(robot.stats['wis'] >= 12 && (robot.drink.length > 0 || robot.food.length > 0)){
+			t2 += i + ") Give item ";
+			robot.socialAct[i] = 'give';
+			i++;
+		}else if(robot.stats['wis'] >= 7){
+			t2 += i + ") Ask Question ";
+			robot.socialAct[i] = 'ask';
+			i++;
+		}
+
+		//options available
+		if(t2 != "")
+			inOpt = true;
+
+		newTxt(t1+"\n"+t2);
+
 	}
 
 	canMove = false;
+		
+		
 }		
+
+// SELECT AN OPTION FOR THE ROBOT TO ACT WITH FOR AN OBJECT
+function objSelectOption(num){
+	if(!inOpt)
+		return;
+
+	//escape options 
+	if(!(num in robot.obj.interSet)){
+		newTxt("Nevermind...");
+		robot.obj = null;
+		inOpt = false;
+
+		return;
+	}
+
+	//otherwise apply change based on probability
+	let s = robot.obj.interSet[num];
+	let r = Math.random();
+	let p = [];
+	for(let a=0;a<s.length;a++){
+		p.push(s[a].prob);
+	}
+	//choose random event
+	let curP = 0;
+	for(let a=0;a<p.length;a++){
+		//match
+		if(r < (curP + p[a])){
+			newTxt(s[a].text);
+			addStats(robot, s[a].statFX);
+			renderStatus();
+			robot.obj = null;
+			inOpt = false;
+			return;
+		}
+		//continue
+		else{
+			curP += p[a];
+		}
+	}
+
+	//should never reach but just in case
+	newTxt("Nevermind...");
+	robot.obj = null;
+	inOpt = false;
+}
+
+function perSelectOption(num){
+	if(!inOpt)
+		return;
+
+	//escape options 
+	if(!(num in robot.socialAct)){
+		newTxt("Nevermind...");
+		robot.other = null;
+		inOpt = false;
+
+		return;
+	}
+
+	let a = robot.socialAct[num];
+
+	if(a == 'push'){
+		if(robot.other.mode != 'str'){
+			newTxt("'Hey watch it!'");
+			robot.other = null;
+			inOpt = false;
+
+			return;
+		}else{
+			newTxt("'Oh you wanna fight?!'");
+			addStats(robot, [0,0,0,0,0,-1]);
+			robot.other = null;
+			inOpt = false;
+
+			return;
+		}
+	}else if(a == 'punch'){
+		//PLACEHOLDER
+		let money = Math.floor(Math.random()*20)+1;
+		newTxt("You knocked them out cold!\nGot $" + money + "!");
+		addStats(robot, [1,0,0,0,0,0]);
+		robot.money += money;
+		robot.other = null;
+		inOpt = false;
+
+		return;
+	}else if(a == 'talk'){
+		if(robot.other.mode != 'cha'){
+			newTxt(monIntro[robot.other.char]);
+			robot.other = null;
+			inOpt = false;
+			
+			return;
+		}else{
+			newTxt("'Oh yeah?'");
+			robot.other = null;
+			inOpt = false;
+			addStats(robot, [0,0,0,(Math.random() > 0.75 ? 1 : 0),0,0]);
+			
+			return;
+		}
+	}else if(a == 'flirt'){
+		if(robot.other.mode != 'cha'){
+			newTxt("'...?'");
+			addStats(robot, [0,0,0,0,0,-1]);
+			robot.other = null;
+			inOpt = false;
+
+			return;
+		}else{
+			newTxt("'Ooo aren't you a sweet talker~'");
+			addStats(robot, [0,0,0,(Math.random() < 0.5 ? 1 : 0),0,0]);
+			robot.other = null;
+			inOpt = false;
+
+			return;
+		}
+	}else if(a == 'wave'){
+		newTxt("They wave back and smile!");
+		robot.other = null;
+		inOpt = false;
+
+		return;
+	}else if(a == 'finger guns'){
+		let r = (Math.random() > 0.25 ? 1 : 0);
+		addStats(robot, [0,0,0,r,0,0]);
+		if(r)
+			newTxt("They are in awe of your coolness!");
+		else
+			newTxt("They look uneasy...");
+		robot.other = null;
+		inOpt = false;
+
+		return;
+	}else if(a == 'give'){
+		let i = Math.floor(Math.random()*robot.drink.length);
+		newTxt("You give them a " + robot.drink[i] + "!\n'Hey thanks dude!'");
+		addStats(robot [0,0,0,3,0,0]);
+		robot.drink.splice(i,1);
+		robot.other = null;
+		inOpt = false;
+
+		return;
+	}else if(a == 'ask'){
+		newTxt("'IDK jack shit my dude...'");
+		robot.other = null;
+		inOpt = false;
+		return;
+	}
+}
 
 
 ///////////////////  AI FUNCTIONS  /////////////////////
@@ -268,11 +532,23 @@ function touchObj(x,y){
 	return null;
 }
 
+// INTERACT WITH A PERSON
+function touchPer(x,y){
+	for(let p=0;p<curMonsters.length;p++){
+		let per = curMonsters[p];
+		if(per.x == x && per.y == y){
+			return per;
+		}
+	}
+	return null;
+}
+
 // ADD NEW TEXT TO THE LOG
 function newTxt(txt){
 	allTxt.push(curTxt);
 	curTxt = txt;
 	renderText();
+	renderStatus();	//just in case
 }
 
 function clearTxt(){
@@ -441,7 +717,10 @@ function renderText(){
 	ttx.font = '30px Proggy';
 	ttx.fillStyle = '#ffffff';
 	//ttx.fillText(String.fromCharCode(9590) + String.fromCharCode(9472) + String.fromCharCode(9488), 10, 20);
-	ttx.fillText(curTxt, 10, 24);
+	let t = curTxt.split("\n");
+	ttx.fillText(t[0], 10, 24);
+	if(t.length > 1)
+		ttx.fillText(t[1], 10, 48);
 
 	ttx.restore();
 }
@@ -500,13 +779,14 @@ function drawMap(){
 // GAME INITIALIZATION FUNCTION
 function init(){
 	//map = initMap(20,20);
-	gotoHouse("random");
+	//gotoHouse("random");
+	newOverworld();
 	renderStatus();
 	renderText();
 }
 
 // MAKE A NEW SCREEN FOR A HOUSE
-function gotoHouse(house){
+function newHouse(house,loc){
 	//make a new house
 	let mset = padMap(makeHouseMap(house),Math.floor(canvas.width/size),Math.floor(canvas.height/size));
 	map = map2Box(mset['map'])
@@ -518,17 +798,127 @@ function gotoHouse(house){
 	else
 		freezeCamera = false;
 
+	panCamera();
+
 	//get robot position
 	let enterPos = findDoor(map);
-	robot.x = enterPos[1];
-	robot.y = enterPos[0]-1;	//place above the door
+	robot.x = enterPos[0];
+	robot.y = enterPos[1]-1;	//place above the door
+
+	world_doors = [[enterPos,"overworld"]];
 
 	//make monsters in the house (placeholder)
 	let nofloor = [robot.x+"-"+robot.y]
 	curMonsters = monsterHouse(mset, nofloor);
 
 	curTxt = "Entered a " + mset['htype'] + "!";
+
+	//save data
+	savedHouses[loc] = {'map':copy2d(map), 'objs':map_obj.slice(), 'monsters':curMonsters.slice()};
 }
+// USE THE SAME HOUSE AS SAVED BEFORE
+function gotoHouse(hset){
+	map = map2Box(hset['map'])
+	map_obj = hset['objs'];
+	curMonsters = hset['monsters'];
+
+	//freeze the camera if house is small
+	if((map[0].length-1) <= Math.floor(canvas.width/size) && (map.length-1) <= Math.floor(canvas.height/size))
+		freezeCamera = true;
+	else
+		freezeCamera = false;
+	panCamera();
+
+	//get robot position
+	let enterPos = findDoor(map);
+	robot.x = enterPos[0];
+	robot.y = enterPos[1]-1;	//place above the door
+
+	world_doors = [[enterPos,"overworld"]];
+
+	curTxt = "Guess who's back! Back again!";
+}
+
+// MAKE NEW SCREEN FOR OVERWORLD
+function newOverworld(side=""){
+	let mset = makeOverworld(side,[4,10]);
+	map = map2Box(mset['map']);
+	world_doors = mset['doors'];
+	map_obj = [];
+
+	//place robot at center
+	robot.x = Math.floor(map[0].length/2);
+	robot.y = Math.floor(map.length/2);
+
+	freezeCamera = false;
+	panCamera();
+
+	//add monsters
+	let nofloor = [robot.x+"-"+robot.y];
+	curMonsters = monsterWorld(map,nofloor);
+
+	curTxt = "Hello PARTY World!";
+
+	robot.stats['int'] = 10;
+
+	savedOverWorld = copy2d(map);
+}
+// USE SAVED OVERWORLD
+function gotoOverworld(){
+	map = savedOverWorld['map'];
+	world_doors = savedOverWorld['doors']
+	map_obj = [];
+
+	freezeCamera = false;
+	panCamera();
+
+
+	robot.x = overworldPos[0];
+	robot.y = overworldPos[1];
+
+	let nofloor = [robot.x+"-"+robot.y];
+	curMonsters = monsterWorld(map,nofloor);
+
+	curTxt = "Back at it again PARTY World!";
+
+	robot.stats['int'] = 10;
+}
+
+function enterDoor(){
+	for(let d=0;d<world_doors.length;d++){
+		let p = world_doors[d][0];
+		console.log(p + " " + robot.x + "," + robot.y)
+		if(p[0] == robot.x && p[1] == robot.y){
+			let envName = world_doors[d][1];
+			//assume overworld was already generated upon starting the game
+			if(envName == 'overworld'){		
+				gotoOverworld();
+			}
+			//enter house
+			else{
+				overworldPos = [robot.x, robot.y+1];
+				savedOverWorld = {'map':copy2d(map),'doors':copy2d(world_doors)}
+
+				let loc = (robot.x+"-"+robot.y);
+				console.log("house partay!");
+
+				//load old house
+				if(loc in savedHouses){
+					gotoHouse(savedHouses[loc]);
+				}//generate new house
+				else{
+					if(envName == 'small' || envName == 'small2'){
+						let h = ['small_party','LAN_party','normal_house','witch_party']
+						newHouse(h[Math.floor(Math.random()*h.length)],loc);
+					}else if(envName == 'large'){
+						newHouse('large_party_(lower)',loc)
+					}
+				}
+			}
+		}
+	}
+}
+
 
 // MAIN GAME LOOP
 function main(){
@@ -564,8 +954,11 @@ document.body.addEventListener("keydown", function (e) {
 	if(inArr(moveKeySet, e.keyCode)){
 		keys[e.keyCode] = true;
 		nextStep();
-	}else if(inArr(actionKeySet, e.keyCode)){
-		keys[e.keyCode] = true;
+	}else if(inArr(num_key_set, e.keyCode) && inOpt){
+		if(robot.obj != null)
+			objSelectOption(e.keyCode - 48);
+		else if(robot.other != null)
+			perSelectOption(e.keyCode - 48);
 	}
 });
 
@@ -574,7 +967,7 @@ document.body.addEventListener("keyup", function (e) {
 	if(inArr(moveKeySet, e.keyCode)){
 		keys[e.keyCode] = false;
 		canMove = true;
-	}else if(inArr(actionKeySet, e.keyCode)){
+	}else if(inArr(num_key_set, e.keyCode)){
 		keys[e.keyCode] = false;
 	}
 });

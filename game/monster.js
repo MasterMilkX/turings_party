@@ -43,6 +43,29 @@ let monsterCharMap = {
 	'@' : 'robot'
 }
 
+let monIntro = {
+	'F' : 'Yo bro!',
+	'S' : 'Heyy~',
+	'L' : "What d'you want?",
+	'e' : '*squeek*',
+	'g' : '*coo*',
+	'D' : 'Delivery?',
+	'B' : "What're you havin'",
+	'c' : '*meow*',
+	'N' : 'H-Hi?',
+	'T' : 'YEEEEAAAHHH!',
+	'p' : '*oink*',
+	'W' : 'Hehehehee!',
+	'm' : '*muttering*',
+	'O' : 'Hi...',
+	'A' : 'Hello!',
+	'&' : 'Hm...',
+	'u' : '*scree*',
+	'r' : '...',
+	'E' : 'Greetings',
+	'@' : '48 65 6c 6c 6f 21'
+}
+
 // RETURNS THE ASCII CHARACTER BASED ON THE NAME
 function getCharRep(name){return Object.keys(monsterCharMap).find(key => monsterCharMap[key] === name);}
 
@@ -99,12 +122,41 @@ function makeMonsterPlus(name,map,excl=[],placeTile='.'){
 
 // ASSIGNS A STAT LIST TO A CHARACTER
 function assignStats(char,statList){
-	char.stats['str'] = statList[0];
-	char.stats['con'] = statList[1];
-	char.stats['dex'] = statList[2];
-	char.stats['cha'] = statList[3];
-	char.stats['int'] = statList[4];
-	char.stats['wis'] = statList[5];
+	//apply
+	let st = ['str', 'con', 'dex', 'cha', 'int', 'wis'];
+	for(let s=0;s<st.length;s++){
+		char.stats[st[s]] = statList[s];
+	}
+}
+
+// ADD VALUE MODIFIER TO STATS
+function addStats(char,statList){
+	//apply
+	let st = ['str', 'con', 'dex', 'cha', 'int', 'wis'];
+	for(let s=0;s<st.length;s++){
+		char.stats[st[s]] += statList[s];
+
+		//add cap
+		if(char.stats[st[s]] > 20)
+			char.stats[st[s]] = 20;
+		else if(char.stats[st[s]] < 0)
+			char.stats[st[s]] = 0
+	}
+}
+
+// LIST THE STATS OF A CHARACTER
+function showStats(char){
+	let st = ['str', 'con', 'dex', 'cha', 'int', 'wis'];
+	let o = "";
+	for(let s=0;s<st.length;s++){
+		o += (st[s].toUpperCase()) + ": " + char.stats[st[s]] + " "
+	}
+	return o.trim();
+}
+
+// SHOW THE HIGHEST STAT OF A CHARACTER
+function showHighStat(char){
+	return char.mode.toUpperCase() + ": " + (char.mode in char.stats ? char.stats[char.mode] : 0);
 }
 
 // RANDOM DnD STAT ROLLER
@@ -335,6 +387,54 @@ function monsterHouse(house,excl=[]){
 				mons.push(mon);
 			}
 		}
+	}
+
+
+	return mons;
+}
+
+// POPULATE OVERWORLD WITH MONSTERS
+function monsterWorld(map,excl=[],range=[5,15]){
+	let mons = [];
+	let numMon = Math.floor(Math.random()*(range[1]-range[0])) + range[0];
+	let percMon = Math.floor(Math.random()*numMon)+1;
+
+	let outMon = ['e','g','D','c','&','r','u'].map(x => monsterCharMap[x]);		//overworld-outdoor based monsters
+	let anyMon = Object.values(monsterCharMap);
+	anyMon.splice(anyMon.indexOf("bartender"),1);
+	anyMon.splice(anyMon.indexOf("store clerk"),1);
+
+	//outdoor monsters only
+	for(let m=0;m<percMon;m++){
+		let c = outMon[Math.floor(Math.random()*outMon.length)];
+		let mon = makeMonsterPlus(c,map,excl);
+		excl.push(mon.x+"-"+mon.y);
+		mons.push(mon);
+	}
+
+	//any monster
+	for(let m=0;m<percMon;m++){
+		let c = anyMon[Math.floor(Math.random()*anyMon.length)];
+		let mon = makeMonsterPlus(c,map,excl);
+		excl.push(mon.x+"-"+mon.y);
+		mons.push(mon);
+	}
+
+	//add store clerk or bartender
+	let vendors = [];
+	for(let r=0;r<map.length;r++){
+		for(let c=0;c<map[0].length;c++){
+			if(map[r][c] == '_'){
+				vendors.push([c,r]);		//save as [x,y]
+			}	
+		}
+	}
+	for(let v=0;v<vendors.length;v++){
+		let mon = makeMonster(monsterCharMap[(Math.random() < 0.5 ? 'S' : 'B')]);
+		mon.x = vendors[v][0];
+		mon.y = vendors[v][1];
+		mon.move = 'idle';
+		mons.push(mon);
 	}
 
 
