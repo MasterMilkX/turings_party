@@ -66,6 +66,7 @@ var robot = {
 	mode : 'neutral',
 	obj : null,
 	other : null,
+	item : null,
 	socialAct : {},
 
 	//stats
@@ -88,6 +89,7 @@ var robot = {
 }
 
 var curMonsters = [];
+var curItems = [];
 
 
 // MAP VARIABLES
@@ -155,7 +157,7 @@ function collide(x,y){
 
 // CHECK IF COLLIDED WITH A MAP OBJECT
 function mapCollide(x,y){
-	return x < 0 || y < 0 || x > map[0].length || y > map.length || inArr(collidable, map[y][x])
+	return x < 0 || y < 0 || x >= map[0].length || y >= map.length || inArr(collidable, map[y][x])
 }
 
 
@@ -230,6 +232,9 @@ function moveRobot(){
 	else if(keys[rightKey] && !collide(robot.x+1, robot.y))
 		robot.x++;
 
+	//see if on something
+	robot.item = touchItem(robot.x,robot.y)
+
 	//check if entering door
 	if(map[robot.y][robot.x] == '/'){
 		enterDoor();
@@ -238,6 +243,9 @@ function moveRobot(){
 	
 	let obj = robot.obj;
 	let other = robot.other;
+	let item = robot.item;
+
+
 	//check for any objects
 	if(obj != null && !inArr(['_',':','}'], map[obj.y][obj.x])){
 		if(!('opt' in obj.interSet))
@@ -325,6 +333,18 @@ function moveRobot(){
 
 		newTxt(t1+"\n"+t2);
 
+	}
+	//check if ontop of item
+	else if(item != null){
+		inOpt = true;
+		if(robot.stats['int'] <= 5)
+			newTxt("You stepped on a thing. Pick it up?\n1) Pick it up  2) Leave it");
+		else if(robot.stats['int'] <= 10){
+			let c = {"!": 'a drink', '%': 'a snack', '*':'something interesting'}
+			newTxt("You stepped " + c[item['symb']] + ". Pick it up?\n1) Pick it up  2) Leave it");
+		}else{
+			newTxt("You stepped on " + item['name'] + ". Pick it up?\n1) Pick it up  2) Leave it");
+		}
 	}
 
 	canMove = false;
@@ -482,6 +502,21 @@ function perSelectOption(num){
 	}
 }
 
+// PICK IT UP BITCH
+function itemSelectOption(num){
+	if(!inOpt)
+		return;
+	if(num == 1){
+		if(robot.item['symb'] == "!" && robot.drinks.length < 4)
+			robot.drinks.push(robot.item['name']);
+		else if(robot.item['symb'] == '%' && robot.food.length < 4)
+			robot.food.push(robot.item['name']);
+		else if(robot.item['symb'] == '')
+
+		robot.item = null;
+	}
+
+}
 
 ///////////////////  AI FUNCTIONS  /////////////////////
 
@@ -539,6 +574,16 @@ function touchPer(x,y){
 		if(per.x == x && per.y == y){
 			return per;
 		}
+	}
+	return null;
+}
+
+// INTERAT WITH ITEMS
+function touchItem(x,y){
+	for(let i=0;i<curItems.length;i++){
+		let item = curItems[i];
+		if(item['loc'][0] == x && item['loc'][1] == y)
+			return item;
 	}
 	return null;
 }
@@ -887,7 +932,7 @@ function gotoOverworld(){
 function enterDoor(){
 	for(let d=0;d<world_doors.length;d++){
 		let p = world_doors[d][0];
-		console.log(p + " " + robot.x + "," + robot.y)
+		//console.log(p + " " + robot.x + "," + robot.y)
 		if(p[0] == robot.x && p[1] == robot.y){
 			let envName = world_doors[d][1];
 			//assume overworld was already generated upon starting the game
@@ -900,7 +945,7 @@ function enterDoor(){
 				savedOverWorld = {'map':copy2d(map),'doors':copy2d(world_doors)}
 
 				let loc = (robot.x+"-"+robot.y);
-				console.log("house partay!");
+				//console.log("house partay!");
 
 				//load old house
 				if(loc in savedHouses){
