@@ -816,6 +816,7 @@ function newHouse(house,loc){
 	//save data
 	savedHouses[loc] = {'map':copy2d(map), 'objs':map_obj.slice(), 'monsters':curMonsters.slice()};
 }
+
 // USE THE SAME HOUSE AS SAVED BEFORE
 function gotoHouse(hset){
 	map = map2Box(hset['map'])
@@ -863,6 +864,7 @@ function newOverworld(side=""){
 
 	savedOverWorld = copy2d(map);
 }
+
 // USE SAVED OVERWORLD
 function gotoOverworld(){
 	map = savedOverWorld['map'];
@@ -884,10 +886,12 @@ function gotoOverworld(){
 	robot.stats['int'] = 10;
 }
 
+
+//TELEPORT TO ANOTHER SCREEN
 function enterDoor(){
 	for(let d=0;d<world_doors.length;d++){
 		let p = world_doors[d][0];
-		console.log(p + " " + robot.x + "," + robot.y)
+		//console.log(p + " " + robot.x + "," + robot.y)
 		if(p[0] == robot.x && p[1] == robot.y){
 			let envName = world_doors[d][1];
 			//assume overworld was already generated upon starting the game
@@ -900,7 +904,7 @@ function enterDoor(){
 				savedOverWorld = {'map':copy2d(map),'doors':copy2d(world_doors)}
 
 				let loc = (robot.x+"-"+robot.y);
-				console.log("house partay!");
+				//console.log("house partay!");
 
 				//load old house
 				if(loc in savedHouses){

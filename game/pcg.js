@@ -666,9 +666,17 @@ function placeBuilding(map, build){
 	return [];
 }
 
-
+//generate the overworld map
 function makeOverworld(start_side="", buildRange=[3,7]){
 	let m = baseOverworld(start_side);
 	let doorSet = makeBuildings(m,buildRange);
 	return {'map': m, 'doors': doorSet};
+}
+
+
+function overworldDat(od){
+	this.overDir = od;
+	this.houses = {};
+	this.map = [];
+	this.doors = [];
 }
