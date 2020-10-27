@@ -14,14 +14,7 @@ let houseCharKey = {
 	'}' : ['bed'],
 	':' : ['toilet'],
 	'+' : ['TV', 'computer', 'stereo','keg'],
-	'_' : ['couch', 'chair', 'stool'],
-	'!' : ['beer', 'vodka', 'fireball', 'jaeger', 'jungle juice', 'McD Sprite', 'blue drink', 'water'],
-	'%' : ['chips', 'pizza', 'cheetos', 'McD Fries', 'chalupa', 'corndog', 'chicken nugs'],
-	'*' : ['greek pin', 'student ID', 'shot glass', 'class ring', 'pencil', 'guitar', 'lampshade', 'house key'],
-	'?' : ['phone'],
-	'$' : ['money'],
-	')' : ['baseball bat', 'fake sword', 'lightsaber'],
-	'(' : ['varsity jacket', 'T-shirt', 'toga', 'bra', 'tie']
+	'_' : ['couch', 'chair', 'stool']
 }
 
 //makes objects
