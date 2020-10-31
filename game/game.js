@@ -67,10 +67,20 @@ var robot = {
 	obj : null,
 	other : null,
 	item : null,
+	itemNo : -1,
 	socialAct : {},
 
 	//stats
 	stats : {
+		'str' : 0,
+		'con' : 0,
+		'dex' : 0,
+		'cha' : 0,
+		'int' : 0,
+		'wis' : 0
+	},
+
+	tempStat : {
 		'str' : 0,
 		'con' : 0,
 		'dex' : 0,
@@ -84,7 +94,7 @@ var robot = {
 	weapon : 'none',
 	money : 0,
 	food : [],
-	drink : [],
+	drinks : [],
 	items : []
 }
 
@@ -93,6 +103,10 @@ var curItems = [];
 
 
 // MAP VARIABLES
+var mapDat = {};
+var mapNum = 0;
+var curWorldIndex = 0;
+
 var map = []
 var map_obj = [];
 var world_doors = [];
@@ -100,6 +114,8 @@ var overworldPos = [];
 
 var savedOverWorld = {};
 var savedHouses = {};
+
+var opposites = {'east':'west','north':'south','south':'north',"west":'east'};
 
 
 // location variables
@@ -176,6 +192,16 @@ function noChar(x,y){
 	return true;
 }
 
+// CHECK IF AN ITEM IS AT THAT SPACE ON THE MAP
+function noItem(x,y){
+	for(let i=0;i<curItems.length;i++){
+		let l = curItems[i].loc;
+		if(l[0] == x && l[1] == y)
+			return false
+	}
+	return true;
+}
+
 
 //////////////    PLAYER FUNCTIONS   /////////////////
 
@@ -186,11 +212,12 @@ function nextStep(){
 		steps++;
 		clearTxt();
 
+		moveRobot();
+
 		//allow characters to move around
 		for(let c=0;c<curMonsters.length;c++)
 			drunkAI(curMonsters[c]);
 
-		moveRobot();
 	}
 }
 
@@ -208,18 +235,34 @@ function moveRobot(){
 	if(keys[upKey]){
 		robot.obj = touchObj(robot.x,robot.y-1);
 		robot.other = touchPer(robot.x,robot.y-1);
+
+		//teleport if at edge of the world
+		if(robot.y == 0)
+			enterWorld("north");
 	}
 	if(keys[downKey]){
 		robot.obj = touchObj(robot.x,robot.y+1);
 		robot.other = touchPer(robot.x,robot.y+1);
+
+		//teleport if at edge of the world
+		if(robot.y == map.length-1)
+			enterWorld("south");
 	}
 	if(keys[leftKey]){
 		robot.obj = touchObj(robot.x-1,robot.y);
 		robot.other = touchPer(robot.x-1,robot.y);
+
+		//teleport if at edge of the world
+		if(robot.x == 0)
+			enterWorld("west");
 	}
 	if(keys[rightKey]){
 		robot.obj = touchObj(robot.x+1,robot.y);
 		robot.other = touchPer(robot.x+1,robot.y);
+
+		//teleport if at edge of the world
+		if(robot.x == map[0].length-1)
+			enterWorld("east");
 	}
 	
 
@@ -233,7 +276,12 @@ function moveRobot(){
 		robot.x++;
 
 	//see if on something
-	robot.item = touchItem(robot.x,robot.y)
+	let it = touchItem(robot.x,robot.y);
+	if(it != null){
+		robot.item = it[0];
+		robot.itemNo = it[1];
+	}
+	
 
 	//check if entering door
 	if(map[robot.y][robot.x] == '/'){
@@ -317,7 +365,7 @@ function moveRobot(){
 		//give item or ask question
 		if(robot.stats['wis'] == 0){
 			//do nothing
-		}else if(robot.stats['wis'] >= 12 && (robot.drink.length > 0 || robot.food.length > 0)){
+		}else if(robot.stats['wis'] >= 12 && (robot.drinks.length > 0 || robot.food.length > 0)){
 			t2 += i + ") Give item ";
 			robot.socialAct[i] = 'give';
 			i++;
@@ -340,8 +388,8 @@ function moveRobot(){
 		if(robot.stats['int'] <= 5)
 			newTxt("You stepped on a thing. Pick it up?\n1) Pick it up  2) Leave it");
 		else if(robot.stats['int'] <= 10){
-			let c = {"!": 'a drink', '%': 'a snack', '*':'something interesting'}
-			newTxt("You stepped " + c[item['symb']] + ". Pick it up?\n1) Pick it up  2) Leave it");
+			let c = {"!": 'a drink', '%': 'a snack', '*':'something', '?':'something hard', '(':'some clothes', ')':'a toy', '$':'some paper'}
+			newTxt("You stepped on " + c[item['symb']] + ". Pick it up?\n1) Pick it up  2) Leave it");
 		}else{
 			newTxt("You stepped on " + item['name'] + ". Pick it up?\n1) Pick it up  2) Leave it");
 		}
@@ -486,10 +534,10 @@ function perSelectOption(num){
 
 		return;
 	}else if(a == 'give'){
-		let i = Math.floor(Math.random()*robot.drink.length);
-		newTxt("You give them a " + robot.drink[i] + "!\n'Hey thanks dude!'");
+		let i = Math.floor(Math.random()*robot.drinks.length);
+		newTxt("You give them a " + robot.drinks[i] + "!\n'Hey thanks dude!'");
 		addStats(robot [0,0,0,3,0,0]);
-		robot.drink.splice(i,1);
+		robot.drinks.splice(i,1);
 		robot.other = null;
 		inOpt = false;
 
@@ -507,13 +555,86 @@ function itemSelectOption(num){
 	if(!inOpt)
 		return;
 	if(num == 1){
-		if(robot.item['symb'] == "!" && robot.drinks.length < 4)
-			robot.drinks.push(robot.item['name']);
-		else if(robot.item['symb'] == '%' && robot.food.length < 4)
-			robot.food.push(robot.item['name']);
-		else if(robot.item['symb'] == '')
+		//drinks
+		if(robot.item['symb'] == "!"){
+			if(robot.drinks.length < 4){
+				robot.drinks.push(robot.item['name']);
+				newTxt("Got " + robot.item['name']);
+			}
+			else{
+				newTxt("You have too many drinks!");
+				return;
+			}
+		}
+		//food
+		else if(robot.item['symb'] == '%'){
+			if(robot.food.length < 4){
+				robot.food.push(robot.item['name']);
+				newTxt("Got " + robot.item['name']);
+			}
+			else{
+				newTxt("You have too much food!");
+				return;
+			}
+		}
+		//items
+		else if(robot.item['symb'] == '*'){
+			if(robot.items.length < 4){
+				robot.items.push(robot.item['name']);
+				newTxt("Got " + robot.item['name']);
+			}
+			else{
+				newTxt("You have too much stuff!");
+				return;
+			}
+		}
+		//pickup money
+		else if(robot.item['symb'] == '$'){
+			robot.money += robot.item['value'];
+			newTxt("Got $" + robot.item['value'] + "!");
+		}
+		//wear armor
+		else if(robot.item['symb'] == '('){
+			robot.armor = robot.item['name'];
+			let statFX = {'varsity jacket' : 'like a tough guy', 'T-shirt' : 'like an average human', 'toga': 'like a fun guy', 'bra' : 'like a nice lady', 'tie' : 'like a gentleman'}
+			let statUp = {'varsity jacket' : [['str',5],['con',3]], 'T-shirt':[['wis',5],['int',3]], 'toga':[['con',5],['cha',3]],'bra':[['cha',5],['dex',3]],'tie':[['int',5],['cha',3]]};
+			newTxt("Put on a " + robot.armor + "!\nYou feel " + statFx[robot.armor]);
+			
+			//set the temp status upgrade
+			let s1 = statUp[robot.item['name']][0];
+			let s2 = statUp[robot.item['name']][1];
 
+			for(let t=0;t<modes.length;t++){robot.tempStat[modes[t]]=0;}
+			robot.tempStat[s1[0]] = s1[1];
+			robot.tempStat[s2[0]] = s2[1];
+		}
+		//equip weapon
+		else if(robot.item['symb'] == ')'){
+			robot.weapon = robot.item['name'];
+			newTxt("Equipped the " + robot.weapon);
+		}
+		//phone
+		else if(robot.item['symb'] == '?'){
+			//give a random hint (ORACLE)
+			let hints = [
+				"It's a tweet about a party!\nTuring's house is " + "? blocks away!",
+				"It's a conspiracy blog!\n'They say aliens love fast food'",
+				"It's a conspiracy blog!\n'They say witches can brew anything'",
+				"It's a vlog!\n'How to be the life of the party'",
+				"The phone's too cracked to read...",
+				"The phone's dead...",
+				"It's a tweet about a party!\n'Hardcore Minecraft LAN party happening now!'",
+				"It's a tweet about a game by Milk!\nBut the last update was 3 weeks ago..",
+				"It's a shitpost!\n'People be eatin' beesed churgers'",
+				"It's a tweet from Kyle!\n'anyone else up at 3:14am? bored af'"
+			]
+			newTxt(hints[Math.floor(Math.random()*hints.length)]);
+		}
+
+		//remove item from list
+		curItems.splice(robot.itemNo,1);
 		robot.item = null;
+		robot.itemNo = -1;
 	}
 
 }
@@ -583,7 +704,7 @@ function touchItem(x,y){
 	for(let i=0;i<curItems.length;i++){
 		let item = curItems[i];
 		if(item['loc'][0] == x && item['loc'][1] == y)
-			return item;
+			return [item,i];
 	}
 	return null;
 }
@@ -685,18 +806,18 @@ function renderStatus(){
 	stx.font = '16px Proggy';
 	stx.textAlign = "right";
 	stx.fillStyle = modeColors['str'];
-	stx.fillText("STR: " + robot.stats['str'], mid-20, 42);
+	stx.fillText("STR: " + (robot.stats['str']+robot.tempStat['str']), mid-20, 42);
 	stx.fillStyle = modeColors['con'];
-	stx.fillText("CON: " + robot.stats['con'], mid-20, 62);
+	stx.fillText("CON: " + (robot.stats['con']+robot.tempStat['con']), mid-20, 62);
 	stx.fillStyle = modeColors['dex'];
-	stx.fillText("DEX: " + robot.stats['dex'], mid-20, 82);
+	stx.fillText("DEX: " + (robot.stats['dex']+robot.tempStat['dex']), mid-20, 82);
 	stx.textAlign = "left"
 	stx.fillStyle = modeColors['cha'];
-	stx.fillText("CHA: " + robot.stats['cha'], mid+20, 42);
+	stx.fillText("CHA: " + (robot.stats['cha']+robot.tempStat['cha']), mid+20, 42);
 	stx.fillStyle = modeColors['int'];
-	stx.fillText("INT: " + robot.stats['int'], mid+20, 62);
+	stx.fillText("INT: " + (robot.stats['int']+robot.tempStat['int']), mid+20, 62);
 	stx.fillStyle = modeColors['wis'];
-	stx.fillText("WIS: " + robot.stats['wis'], mid+20, 82);
+	stx.fillText("WIS: " + (robot.stats['wis']+robot.tempStat['wis']), mid+20, 82);
 
 	stx.fillStyle = "#ffffff";
 	stx.fillRect(0,100,canvas2.width,2)
@@ -734,10 +855,10 @@ function renderStatus(){
 		stx.textAlign = (side == 15 ? 'left' : 'right');
 		stx.fillText(robot.food[i],side,225+((i>1)*15));
 	}
-	for(let i=0;i<robot.drink.length;i++){
+	for(let i=0;i<robot.drinks.length;i++){
 		let side = (i%2 == 0 ? 15 : canvas2.width-15);
 		stx.textAlign = (side == 15 ? 'left' : 'right');
-		stx.fillText(robot.drink[i],side,275+((i>1)*15));
+		stx.fillText(robot.drinks[i],side,275+((i>1)*15));
 	}
 	for(let i=0;i<robot.items.length;i++){
 		let side = (i%2 == 0 ? 15 : canvas2.width-15);
@@ -802,7 +923,7 @@ function drawMap(){
 	ctx.textAlign = "center";
 	for(let r=0;r<map.length;r++){
 		for(let c=0;c<map[0].length;c++){
-			if(noChar(c,r)){
+			if(noChar(c,r) && noItem(c,r)){
 				let m = map[r][c];
 				ctx.fillText((Number.isInteger(m) ? String.fromCharCode(m) : m), c*size, r*size);
 			}
@@ -814,6 +935,13 @@ function drawMap(){
 		let o = map_obj[i];
 		ctx.fillStyle = o.c;
 		ctx.fillText(map[o.y][o.x],o.x*size,o.y*size);
+	}
+
+	//draw items
+	for(let i=0;i<curItems.length;i++){
+		let it = curItems[i];
+		ctx.fillStyle = itemColor(it.name);
+		ctx.fillText(it.symb,it.loc[0]*size,it.loc[1]*size);
 	}
 	
 	ctx.fillStyle = '#ffffff';
@@ -828,6 +956,12 @@ function init(){
 	newOverworld();
 	renderStatus();
 	renderText();
+
+	//save first world data
+	mapDat = {};
+	saveWorldDat(mapNum);
+	mapDat[mapNum].index = mapNum;
+	mapNum++;
 }
 
 // MAKE A NEW SCREEN FOR A HOUSE
@@ -856,10 +990,13 @@ function newHouse(house,loc){
 	let nofloor = [robot.x+"-"+robot.y]
 	curMonsters = monsterHouse(mset, nofloor);
 
+	//make items
+	curItems = litterHouse(mset['map'],mset['htype']);
+
 	curTxt = "Entered a " + mset['htype'] + "!";
 
 	//save data
-	savedHouses[loc] = {'map':copy2d(map), 'objs':map_obj.slice(), 'monsters':curMonsters.slice()};
+	savedHouses[loc] = {'map':copy2d(map), 'objs':map_obj.slice(), 'monsters':curMonsters.slice(), 'items': curItems.slice()};
 }
 
 // USE THE SAME HOUSE AS SAVED BEFORE
@@ -867,6 +1004,7 @@ function gotoHouse(hset){
 	map = map2Box(hset['map'])
 	map_obj = hset['objs'];
 	curMonsters = hset['monsters'];
+	curItems = hset['items'];
 
 	//freeze the camera if house is small
 	if((map[0].length-1) <= Math.floor(canvas.width/size) && (map.length-1) <= Math.floor(canvas.height/size))
@@ -907,7 +1045,8 @@ function newOverworld(side=""){
 
 	robot.stats['int'] = 10;
 
-	savedOverWorld = copy2d(map);
+	savedOverWorld['map'] = copy2d(map);
+	savedOverWorld['doors'] = copy2d(world_doors);
 }
 
 // USE SAVED OVERWORLD
@@ -918,7 +1057,6 @@ function gotoOverworld(){
 
 	freezeCamera = false;
 	panCamera();
-
 
 	robot.x = overworldPos[0];
 	robot.y = overworldPos[1];
@@ -941,6 +1079,8 @@ function enterDoor(){
 			let envName = world_doors[d][1];
 			//assume overworld was already generated upon starting the game
 			if(envName == 'overworld'){		
+				let loc = (overworldPos[0]+"-"+(overworldPos[1]-1));
+				savedHouses[loc].items = curItems.splice();
 				gotoOverworld();
 			}
 			//enter house
@@ -967,6 +1107,97 @@ function enterDoor(){
 		}
 	}
 }
+
+//TELEPORT TO ANOTHER OVERWORLD
+function enterWorld(dir){
+	//check if the world already exists
+	let nextWorldInd = mapDat[curWorldIndex].overDir[dir];
+	if(nextWorldInd != null){
+		let nextWorld = mapDat[nextWorldInd];
+		map = nextWorld.map;
+		savedHouses = nextWorld.houseDat;
+		world_doors = nextWorld.doors;
+
+		//place robot at center
+		robot.x = Math.floor(map[0].length/2);
+		robot.y = Math.floor(map.length/2);
+
+		//make at edge of map
+		let oppDir = opposites[dir];
+		if(oppDir == "east")
+			robot.x = map[0].length-1;
+		else if(oppDir == "west")
+			robot.x = 0;
+		else if(oppDir == "south")
+			robot.y = map.length-1;
+		else if(oppDir == "north")
+			robot.y = 0;
+
+		//reset camera
+		freezeCamera = false;
+		panCamera();
+
+		//add monsters
+		let nofloor = [robot.x+"-"+robot.y];
+		curMonsters = monsterWorld(map,nofloor);
+
+		//import placements
+		savedOverWorld['map'] = copy2d(map);
+		savedOverWorld['doors'] = copy2d(world_doors);
+
+		//reset index to current world index
+		curWorldIndex = nextWorld.index;
+
+	}
+	//otherwise make a new world
+	else{
+
+		let oppDir = opposites[dir];
+		newOverworld(oppDir);
+
+		//set robot position to edge of the map
+		if(oppDir == "east")
+			robot.x = map[0].length-1;
+		else if(oppDir == "west")
+			robot.x = 1;
+		else if(oppDir == "south")
+			robot.y = map.length-1;
+		else if(oppDir == "north")
+			robot.y = 1;
+
+		//save new world data
+		saveWorldDat(mapNum);
+
+		//link world data
+		addWorldDat(mapDat[mapNum],dir,mapDat[curWorldIndex]);
+
+		curWorldIndex = mapNum-1;	//set cur world index to new world
+	}
+	
+}
+
+// adds a new map to the map data dictionary for linking
+function addWorldDat(nw, d, ow){
+	//set properties for the new world
+	mapDat[mapNum] = {...nw};
+	mapDat[mapNum].index = mapNum;
+	mapDat[mapNum].overDir[opposites[d]] = ow.index;
+
+	//link old world to new world
+	mapDat[ow.index].overDir[d] = mapNum;
+
+	//increment
+	mapNum++;
+}
+
+//saves current overworld data to a worldDat object
+function saveWorldDat(index){
+	mapDat[index] = new overworldDat();
+	mapDat[index].houseDat = {...savedHouses};
+	mapDat[index].doors = copy2d(savedOverWorld['doors']);
+	mapDat[index].map = copy2d(savedOverWorld['map']);
+}
+
 
 
 // MAIN GAME LOOP
@@ -1008,6 +1239,8 @@ document.body.addEventListener("keydown", function (e) {
 			objSelectOption(e.keyCode - 48);
 		else if(robot.other != null)
 			perSelectOption(e.keyCode - 48);
+		else if(robot.item != null)
+			itemSelectOption(e.keyCode - 48);
 	}
 });
 

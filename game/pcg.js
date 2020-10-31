@@ -283,7 +283,7 @@ function makeHouseMap(houseType='random'){
 		['#','.','.','=','=','.','#','.','.','.','.','.','#'],
 		['#','.','.','=','=','.','#','.','+','+','.',']','#'],
 		['#','.','.','.','.','.','#','.','.','.','.',']','#'],
-		['#','/','/','#','#','#','#','#','#','#','#','#','#']
+		['#','/','#','#','#','#','#','#','#','#','#','#','#']
 		]
 		let house_objs = [
 			//first room
@@ -666,10 +666,11 @@ function makeOverworld(start_side="", buildRange=[3,7]){
 	return {'map': m, 'doors': doorSet};
 }
 
-
-function overworldDat(od){
-	this.overDir = od;
-	this.houses = {};
+//make overworld data object
+function overworldDat(){
+	this.overDir = {'north':null, 'south':null,'east':null,'west':null};		//save pointers to other overworlds
+	this.houseDat = {};
 	this.map = [];
 	this.doors = [];
+	this.index = -1;
 }
